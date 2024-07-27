@@ -1,0 +1,16 @@
+# .htaccess file
+
+# Enable WSGI
+AddHandler wsgi-script .wsgi
+
+# Set the WSGI script alias
+WSGIScriptAlias / /home/your_username/public_html/your_project_directory/wsgi.py
+
+# Directory permissions
+<Directory /home/your_username/public_html/your_project_directory>
+    Require all granted
+</Directory>
+
+# Python path
+WSGIDaemonProcess your_project_directory python-path=/home/your_username/public_html/your_project_directory:/home/your_username/public_html/your_project_directory/venv/lib/python3.x/site-packages
+WSGIProcessGroup your_project_directory
