@@ -1,0 +1,578 @@
+:root {
+  --background-color: #1e1e2f;
+  --text-color: #ffffff;
+  --sidebar-background-color: #2c2c4b;
+  --border-color: #3b3b58;
+  --hover-background-color: #57577a;
+  --input-background-color: #2c2c4b;
+  --input-border-color: #3b3b58;
+  --button-background-color: #57577a;
+  --button-hover-background-color: #7474a6;
+  --code-background-color: #2b2b2b;
+  --code-text-color: #f8f8f2;
+  --assistant-message-color: #ff99ff;
+  --user-message-color: #a3a3ff;
+  --typing-indicator-color: #b3b3ff;
+  --modal-background-color: #1e1e2f;
+  --modal-text-color: #ffffff;
+}
+
+.light-theme {
+  --background-color: #f5f5f5;
+  --text-color: #000000;
+  --sidebar-background-color: #e0e0e0;
+  --border-color: #cccccc;
+  --hover-background-color: #d3d3d3;
+  --input-background-color: #ffffff;
+  --input-border-color: #cccccc;
+  --button-background-color: #e0e0e0;
+  --button-hover-background-color: #d3d3d3;
+  --code-background-color: #f0f0f0;
+  --code-text-color: #000000;
+  --assistant-message-color: #5c5c5c;
+  --user-message-color: #4a4a4a;
+  --typing-indicator-color: #7a7a7a;
+  --modal-background-color: #f5f5f5;
+  --modal-text-color: #000000;
+}
+
+.blue-theme {
+  --background-color: #001f3f;
+  --text-color: #ffffff;
+  --sidebar-background-color: #00274d;
+  --border-color: #003366;
+  --hover-background-color: #004080;
+  --input-background-color: #00274d;
+  --input-border-color: #003366;
+  --button-background-color: #004080;
+  --button-hover-background-color: #0055b3;
+  --code-background-color: #003366;
+  --code-text-color: #ffffff;
+  --assistant-message-color: #99ccff;
+  --user-message-color: #80bfff;
+  --typing-indicator-color: #cce0ff;
+  --modal-background-color: #001f3f;
+  --modal-text-color: #ffffff;
+}
+
+.black-theme {
+  --background-color: #000000;
+  --text-color: #ffffff;
+  --sidebar-background-color: #1a1a1a;
+  --border-color: #333333;
+  --hover-background-color: #333333;
+  --input-background-color: #1a1a1a;
+  --input-border-color: #333333;
+  --button-background-color: #333333;
+  --button-hover-background-color: #4d4d4d;
+  --code-background-color: #333333;
+  --code-text-color: #ffffff;
+  --assistant-message-color: #cccccc;
+  --user-message-color: #999999;
+  --typing-indicator-color: #666666;
+  --modal-background-color: #000000;
+  --modal-text-color: #ffffff;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+.App {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden; /* Prevent whole window from scrolling */
+}
+
+.App-header {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  flex-grow: 1;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  padding: 10px;
+}
+
+.sidebar,
+.history-sidebar {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 250px;
+  overflow-y: auto;
+  background-color: var(--sidebar-background-color);
+  z-index: 1;
+  transition: transform 0.3s ease;
+  height: 100vh; /* Make the sidebar full height */
+}
+
+.sidebar {
+  left: 0;
+  transform: translateX(-100%);
+}
+
+.history-sidebar {
+  right: 0;
+  transform: translateX(100%);
+}
+
+.sidebar.visible,
+.history-sidebar.visible {
+  transform: translateX(0);
+}
+
+.sidebar h2,
+.history-sidebar h2 {
+  color: var(--text-color);
+  font-size: 1.5em; /* Increased font size */
+  font-weight: bold; /* Make the text bold */
+}
+
+.sidebar ul,
+.history-sidebar ul {
+  list-style: none;
+  padding: 0;
+  flex-grow: 1;
+}
+
+.sidebar li,
+.history-sidebar li {
+  padding: 10px;
+  cursor: pointer;
+  color: var(--text-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 10px; /* Added margin to the bottom */
+}
+
+.sidebar li:hover,
+.history-sidebar li:hover {
+  background-color: var(--hover-background-color);
+}
+
+.sidebar .options-button {
+  background: none;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  margin-left: 10px;
+}
+
+.sidebar .new-chat-button,
+.history-sidebar .new-chat-button {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: var(--button-background-color);
+  border: 2px solid var(--border-color); /* Added permanent dark border */
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.sidebar .new-chat-button:hover,
+.history-sidebar .new-chat-button:hover {
+  background-color: var(--button-hover-background-color);
+}
+
+.chat-container {
+  flex: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  width: 100%; /* Adjusted width to take full screen */
+  padding-top: 20px; /* Add padding from the top */
+  padding-right: 50px; /* Add padding from the right */
+  padding-bottom: 10px; /* Reduce padding from the bottom */
+}
+
+.chat-log {
+  flex-grow: 1;
+  height: calc(100vh - 300px); /* Ensure the chat log fits within the window height */
+  overflow-y: auto; /* Ensure the chat log is scrollable */
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+  padding: 10px;
+  background-color: var(--background-color);
+  width: 100%; /* Set the chat log width to 100% of its container */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start; /* Align items to the top */
+}
+
+.chat-log::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-log::-webkit-scrollbar-thumb {
+  background-color: var(--hover-background-color);
+  border-radius: 4px;
+}
+
+.chat-log::-webkit-scrollbar-track {
+  background: var(--sidebar-background-color);
+  border-radius: 4px;
+}
+
+.user-message {
+  color: var(--user-message-color);
+  text-align: left;
+  margin-bottom: 10px;
+  width: 100%;
+}
+
+.assistant-message {
+  color: var(--assistant-message-color);
+  text-align: left;
+  margin-bottom: 10px;
+  width: 100%;
+}
+
+.typing-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.typing-dot {
+  width: 8px;
+  height: 8px;
+  margin: 0 2px;
+  background-color: var(--typing-indicator-color);
+  border-radius: 50%;
+  animation: typing 1s infinite;
+}
+
+.typing-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing {
+  0%, 60%, 100% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+.user-message span, .assistant-message span {
+  display: block;
+  margin-top: 5px;
+}
+
+.user-message-content {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  cursor: pointer;
+  max-height: calc(1.2em * 5); /* Modify the value to control the number of lines displayed */
+  line-height: 1.2em; /* Set the line height to match the height of one line of text */
+}
+
+.user-message-content.expanded {
+  white-space: pre-wrap;
+  max-height: none;
+}
+
+input, button, textarea {
+  margin: 5px;
+  padding: 10px;
+  border: 1px solid var(--input-border-color);
+  background-color: var(--input-background-color);
+  color: var(--text-color);
+}
+
+button {
+  cursor: pointer;
+  background-color: var(--button-background-color);
+}
+
+button:hover {
+  background-color: var(--button-hover-background-color);
+}
+
+textarea.user-input {
+  width: 100%;
+  height: 40px;
+  resize: none;
+  transition: height 0.3s ease;
+}
+
+textarea.user-input.expanded {
+  height: 200px;
+}
+
+.input-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.input-container.expanded {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  background-color: var(--background-color);
+  padding: 10px;
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.5);
+  flex-direction: column; /* Ensure instructions are below the input */
+}
+
+.expand-button {
+  background: none;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  margin-right: auto; /* Align to the left */
+}
+
+.new-line-instruction {
+  margin-top: 5px;
+}
+
+.code-block-container {
+  position: relative;
+  margin-bottom: 1em;
+  width: 100%;
+  color: green;
+  background-color: black;  
+}
+
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--hover-background-color);
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  padding: 5px 10px;
+  font-family: monospace;
+  font-size: 0.85em;
+  color: var(--text-color);
+  margin-bottom: 0; /* Remove gap between button and code */
+}
+
+.code-type {
+  font-weight: bold;
+}
+
+.copy-button {
+  background: none;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.code-block {
+  background-color: var(--code-background-color);
+  color: var(--code-text-color);
+  padding: 10px;
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  margin: 0; /* Remove gap between button and code */
+  font-family: Consolas, "Courier New", monospace;
+  text-align: left;
+}
+
+pre {
+  padding: 2em 0;
+  overflow-x: auto;
+}
+
+pre::-webkit-scrollbar {
+  width: 8px;
+}
+
+pre::-webkit-scrollbar-thumb {
+  background-color: var(--hover-background-color);
+  border-radius: 4px;
+}
+
+pre::-webkit-scrollbar-track {
+  background: var(--sidebar-background-color);
+  border-radius: 4px;
+}
+
+.settings-icon {
+  cursor: pointer;
+  margin-left: 10px; /* Margin to space it from the text */
+}
+
+.ReactModal__Overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  z-index: 1000;
+}
+
+.ReactModal__Content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%; /* Ensure the modal fits on smaller screens */
+  max-width: 400px;
+  background-color: var(--modal-background-color);
+  border: 2px solid var(--border-color);
+  padding: 20px;
+  z-index: 1001; /* Ensure modal is above the overlay */
+  color: var(--modal-text-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-modal h2 {
+  color: var(--modal-text-color);
+}
+
+.settings-modal button {
+  background-color: var(--button-background-color);
+  color: var(--modal-text-color);
+  border: 1px solid var(--border-color);
+  margin: 5px;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.settings-modal button:hover {
+  background-color: var(--button-hover-background-color);
+}
+
+.settings-modal .setting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 10px 0;
+  width: 80%;
+}
+
+.settings-modal .setting label {
+  margin-bottom: 5px;
+  color: var(--modal-text-color);
+}
+
+.settings-modal .setting input[type="range"] {
+  width: 100%;
+}
+
+.settings-modal textarea {
+  width: 100%;
+  height: 100px;
+  margin-bottom: 10px;
+}
+
+.settings-modal button[type="submit"] {
+  background-color: var(--button-background-color);
+  color: var(--modal-text-color);
+  border: 1px solid var(--border-color);
+  padding: 10px;
+  cursor: pointer;
+}
+
+.settings-modal button[type="submit"]:hover {
+  background-color: var(--button-hover-background-color);
+}
+
+.settings-modal .setting {
+  margin-top: 20px;
+}
+
+textarea.user-input::-webkit-scrollbar {
+  width: 8px;
+  background-color: var(--border-color); /* Set scrollbar color to match the theme */
+}
+
+textarea.user-input::-webkit-scrollbar-thumb {
+  background-color: var(--hover-background-color); /* Set scrollbar thumb color to match the theme */
+  border-radius: 4px;
+}
+
+textarea.user-input::-webkit-scrollbar-track {
+  background: var(--input-background-color); /* Set scrollbar track color to match the theme */
+  border-radius: 4px;
+}
+
+.toggle-sidebar-button {
+  background: none;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  position: absolute;
+  top: 15px; /* Move up by 5px */
+  z-index: 2;
+}
+
+.toggle-sidebar-button.left {
+  left: 10px;
+}
+
+.toggle-sidebar-button.right {
+  right: 10px;
+}
+
+@media (min-width: 768px) {
+  .sidebar,
+  .history-sidebar {
+    position: relative;
+    transform: none;
+  }
+
+  .toggle-sidebar-button {
+    display: none;
+  }
+}
+
+.options-menu {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  background-color: var(--sidebar-background-color);
+  border: 1px solid var(--border-color);
+  z-index: 10;
+  padding: 5px;
+}
+
+.options-menu button {
+  background: none;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  display: block;
+}
