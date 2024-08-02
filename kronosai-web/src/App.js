@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
-import { FaCog, FaPlus, FaMinus, FaChevronLeft, FaChevronRight, FaEllipsisV } from 'react-icons/fa';
+import { FaCog, FaPlus, FaMinus, FaAngleLeft, FaAngleRight, FaEllipsisV } from 'react-icons/fa';
 import Modal from 'react-modal';
 import { marked } from 'marked';
 import hljs from 'highlight.js';
-import 'highlight.js/styles/github-dark.css';
+import 'highlight.js/styles/github-dark.css'; // Importing the GitHub Dark theme
 
 Modal.setAppElement('#root');
 
@@ -16,39 +16,83 @@ marked.setOptions({
   },
 });
 
+const debounce = (func, delay) => {
+  let timeoutId;
+  return (...args) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(() => {
+      func(...args);
+    }, delay);
+  };
+};
+
+const initializeChats = () => {
+  try {
+    const storedChats = localStorage.getItem('chats');
+    return storedChats ? JSON.parse(storedChats) : [];
+  } catch (error) {
+    console.error('Failed to parse chats from localStorage:', error);
+    return [];
+  }
+};
+
 function App() {
   const [userInput, setUserInput] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
   const [response, setResponse] = useState('');
   const [chatTitle, setChatTitle] = useState('New Chat');
-  const [chats, setChats] = useState(JSON.parse(localStorage.getItem('chats')) || []);
+  const [chats, setChats] = useState(initializeChats());
   const [loading, setLoading] = useState(false);
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'purple');
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
   const [modalIsOpen, setModalIsOpen] = useState(false);
-  const [suggestionsModalIsOpen, setSuggestionsModalIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [lineHeight, setLineHeight] = useState(parseFloat(localStorage.getItem('lineHeight')) || 1.2);
   const [fontSize, setFontSize] = useState(parseFloat(localStorage.getItem('fontSize')) || 16);
   const [isAssistantTyping, setIsAssistantTyping] = useState(false);
   const [showSavedChats, setShowSavedChats] = useState(window.innerWidth >= 768);
   const [showChatHistory, setShowChatHistory] = useState(window.innerWidth >= 768);
-  const [suggestion, setSuggestion] = useState('');
   const [suggestions, setSuggestions] = useState([]);
-  const [userName, setUserName] = useState('');
+  const [suggestionsModalIsOpen, setSuggestionsModalIsOpen] = useState(false);
+  const [viewSuggestionsModalIsOpen, setViewSuggestionsModalIsOpen] = useState(false);
+  const [confirmationPopupVisible, setConfirmationPopupVisible] = useState(false);
   const chatLogRef = useRef(null);
   const isInteractingWithMessage = useRef(false);
 
   useEffect(() => {
-    document.title = 'Kronos AI'; // Set the browser tab title
+    document.title = "Kronos AI";
+    document.body.classList.add(theme);
+  }, [theme]);
 
-    const savedChatHistory = localStorage.getItem('chatHistory');
-    if (savedChatHistory) {
-      setChatHistory(JSON.parse(savedChatHistory));
-    }
-    const savedChatTitle = localStorage.getItem('chatTitle');
-    if (savedChatTitle) {
-      setChatTitle(savedChatTitle);
-    }
+  const escapeHtml = (unsafe) => {
+    return unsafe
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  };
+
+  useEffect(() => {
+    const safeParseJSON = (item, fallback) => {
+      try {
+        return item ? JSON.parse(item) : fallback;
+      } catch (error) {
+        console.error(`Failed to parse item from localStorage: ${error}`);
+        return fallback;
+      }
+    };
+
+    const savedChatHistory = safeParseJSON(localStorage.getItem('chatHistory'), []);
+    const savedChatTitle = localStorage.getItem('chatTitle') || 'New Chat';
+    const savedLineHeight = parseFloat(localStorage.getItem('lineHeight')) || 1.2;
+    const savedFontSize = parseFloat(localStorage.getItem('fontSize')) || 16;
+
+    setChatHistory(savedChatHistory);
+    setChatTitle(savedChatTitle);
+    setLineHeight(savedLineHeight);
+    setFontSize(savedFontSize);
   }, []);
 
   useEffect(() => {
@@ -69,14 +113,25 @@ function App() {
     hljs.highlightAll();
   }, [chatHistory]);
 
+  const fetchChats = async () => {
+    const savedChats = initializeChats();
+    setChats(savedChats);
+  };
+
   const sendMessage = async () => {
     if (!userInput.trim()) return;
     const escapedUserInput = escapeHtml(userInput).replace(/\n/g, '<br>');
     setLoading(true);
     setIsAssistantTyping(true);
 
+    const userMessage = { speaker: 'You', content: escapedUserInput, isExpanded: false };
+
+    // Add user message to chat history
+    setChatHistory((prevChatHistory) => [...prevChatHistory, userMessage]);
+    setUserInput('');
+
     try {
-      const res = await fetch('https://kronosai-suggestions-d03c952fecd6.herokuapp.com/send_message', {
+      const res = await fetch('https://kronosai-59ad0fce9738.herokuapp.com/send_message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_input: escapedUserInput, chat_history: chatHistory, chat_title: chatTitle })
@@ -87,24 +142,21 @@ function App() {
       }
 
       const data = await res.json();
-      setResponse(data.response);
       setLoading(false);
       setIsAssistantTyping(false);
-
       if (chatTitle === 'New Chat') {
         setChatTitle(data.chat_name);
         localStorage.setItem('chatTitle', data.chat_name);
       }
 
-      const updatedChatHistory = [...chatHistory, { speaker: 'You', content: escapedUserInput, isExpanded: false }, { speaker: 'Assistant', content: data.response }];
-      setChatHistory(updatedChatHistory);
-      localStorage.setItem('chatHistory', JSON.stringify(updatedChatHistory));
+      // Add assistant message to chat history
+      setChatHistory((prevChatHistory) => [...prevChatHistory, { speaker: 'Assistant', content: data.response }]);
+      localStorage.setItem('chatHistory', JSON.stringify([...chatHistory, userMessage, { speaker: 'Assistant', content: data.response }]));
 
-      const updatedChats = [...chats.filter(chat => chat.title !== chatTitle), { title: chatTitle === 'New Chat' ? data.chat_name : chatTitle, history: updatedChatHistory }];
+      const updatedChats = [...chats.filter(chat => chat.title !== chatTitle), { title: chatTitle === 'New Chat' ? data.chat_name : chatTitle, history: [...chatHistory, userMessage, { speaker: 'Assistant', content: data.response }] }];
       setChats(updatedChats);
       localStorage.setItem('chats', JSON.stringify(updatedChats));
 
-      setUserInput('');
       scrollToBottom();
     } catch (error) {
       console.error('Error sending message:', error);
@@ -133,6 +185,9 @@ function App() {
       setChatHistory(chat.history);
       localStorage.setItem('chatHistory', JSON.stringify(chat.history));
       localStorage.setItem('chatTitle', chat.title);
+      if (window.innerWidth < 768) {
+        setShowSavedChats(false);
+      }
     }
   };
 
@@ -141,6 +196,9 @@ function App() {
     setChatHistory([]);
     localStorage.removeItem('chatHistory');
     localStorage.removeItem('chatTitle');
+    if (window.innerWidth < 768) {
+      setShowSavedChats(false);
+    }
   };
 
   const scrollToMessage = (index) => {
@@ -155,7 +213,7 @@ function App() {
       if (targetElement) {
         const offsetTop = targetElement.offsetTop;
         chatLogElement.scrollTo({
-          top: offsetTop - 110,
+          top: offsetTop - 100,
           behavior: 'smooth',
         });
       }
@@ -168,7 +226,6 @@ function App() {
         top: chatLogRef.current.scrollHeight,
         behavior: 'smooth'
       });
-      chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight;
     }
   };
 
@@ -220,6 +277,16 @@ function App() {
     }, 100);
   };
 
+  const shouldShowExpandIcon = (content) => {
+    const div = document.createElement('div');
+    div.innerHTML = content;
+    return div.getElementsByTagName('br').length > 1;
+  };
+
+  const toggleExpand = () => {
+    setIsExpanded(!isExpanded);
+  };
+
   const formatMessage = (msg) => {
     let htmlContent = marked(msg);
 
@@ -232,10 +299,10 @@ function App() {
       const language = block.match(/language-([^"]*)/)[1];
       const codeContent = block.match(/<code class="[^"]*">([\s\S]*?)<\/code>/)[1];
       const encodedCode = btoa(codeContent);
-      const button = `<button className="copy-button" data-code="${encodedCode}">Copy code</button>`;
-      const modifiedBlock = `<div className="code-block-container">
-                                <div className="code-block-header">
-                                  <span className="code-type">${language}</span>
+      const button = `<button class="copy-button" data-code="${encodedCode}">Copy code</button>`;
+      const modifiedBlock = `<div class="code-block-container">
+                                <div class="code-block-header">
+                                  <span class="code-type">${language}</span>
                                   ${button}
                                 </div>
                                 ${block}
@@ -254,27 +321,27 @@ function App() {
     setModalIsOpen(false);
   };
 
-  const openSuggestionsModal = async () => {
-    try {
-      const res = await fetch('https://kronosai-suggestions-d03c952fecd6.herokuapp.com/suggestions');
-      if (!res.ok) {
-        throw new Error('Failed to fetch suggestions.');
-      }
-      const data = await res.json();
-      setSuggestions(data);
-      setSuggestionsModalIsOpen(true);
-    } catch (error) {
-      console.error('Error fetching suggestions:', error);
-      alert('Failed to fetch suggestions.');
-    }
+  const openSuggestionsModal = () => {
+    setSuggestionsModalIsOpen(true);
   };
 
   const closeSuggestionsModal = () => {
     setSuggestionsModalIsOpen(false);
   };
 
+  const openViewSuggestionsModal = () => {
+    setViewSuggestionsModalIsOpen(true);
+    fetchSuggestions(); // Fetch suggestions when opening the view modal
+  };
+
+  const closeViewSuggestionsModal = () => {
+    setViewSuggestionsModalIsOpen(false);
+  };
+
   const changeTheme = (newTheme) => {
+    document.body.classList.remove(theme);
     setTheme(newTheme);
+    document.body.classList.add(newTheme);
     localStorage.setItem('theme', newTheme);
   };
 
@@ -290,41 +357,117 @@ function App() {
     localStorage.setItem('fontSize', newFontSize);
   };
 
-  const handleSubmitSuggestion = async (e) => {
+  const handleSuggestionSubmit = async (e) => {
     e.preventDefault();
-    if (!suggestion.trim() || !userName.trim()) return;
+    const suggestion = e.target.elements.suggestion.value;
+    const userName = e.target.elements.name.value;
+
+    console.log('Suggestion:', suggestion);
+    console.log('UserName:', userName);
+
     try {
       const res = await fetch('https://kronosai-suggestions-d03c952fecd6.herokuapp.com/submit_suggestion', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ suggestion, userName })
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ userName, suggestion })
       });
+
       if (!res.ok) {
-        throw new Error('Failed to submit suggestion.');
+        throw new Error('Failed to submit suggestion');
       }
-      setSuggestion('');
-      setUserName('');
-      alert('Suggestion submitted successfully!');
+
+      const responseText = await res.text();
+      console.log('Response:', responseText);
+
+      // Add the new suggestion to the state
+      setSuggestions((prevSuggestions) => [...prevSuggestions, { suggestion, userName }]);
+      setConfirmationPopupVisible(true);
+      setTimeout(() => {
+        setConfirmationPopupVisible(false);
+      }, 3000); // Hide the popup after 3 seconds
+      e.target.reset();
+      closeSuggestionsModal();
     } catch (error) {
       console.error('Error submitting suggestion:', error);
-      alert('Failed to submit suggestion.');
     }
   };
 
-  const themeClasses = `${theme}-theme`;
+  const fetchSuggestions = async () => {
+    try {
+      const res = await fetch('https://kronosai-suggestions-d03c952fecd6.herokuapp.com/suggestions');
 
-  const toggleExpand = () => {
-    setIsExpanded(!isExpanded);
+      if (!res.ok) {
+        throw new Error('Failed to fetch suggestions');
+      }
+
+      const suggestions = await res.json();
+      setSuggestions(suggestions);
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+    }
   };
 
-  const shouldShowExpandIcon = (content) => {
-    const div = document.createElement('div');
-    div.innerHTML = content;
-    return div.getElementsByTagName('br').length > 1;
+  const handleClickOutside = (event) => {
+    if (
+      !event.target.closest('.sidebar') &&
+      !event.target.closest('.history-sidebar') &&
+      !event.target.closest('.toggle-sidebar-button')
+    ) {
+      if (window.innerWidth < 768) {
+        setShowSavedChats(false);
+        setShowChatHistory(false);
+      }
+    }
+  };
+
+  const toggleSidebar = debounce((sidebar) => {
+    if (sidebar === 'savedChats') {
+      setShowSavedChats((prevShowSavedChats) => {
+        const newState = !prevShowSavedChats;
+        if (newState) {
+          setShowChatHistory(false); // Close chatHistory sidebar if opening savedChats
+        }
+        console.log('Toggled Saved Chats:', newState);
+        return newState;
+      });
+    } else if (sidebar === 'chatHistory') {
+      setShowChatHistory((prevShowChatHistory) => {
+        const newState = !prevShowChatHistory;
+        if (newState) {
+          setShowSavedChats(false); // Close savedChats sidebar if opening chatHistory
+        }
+        console.log('Toggled Chat History:', newState);
+        return newState;
+      });
+    }
+  }, 300);
+
+  useEffect(() => {
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
+  const handleRenameChat = (title) => {
+    const newTitle = prompt('Enter new chat name:', title);
+    if (newTitle) {
+      const updatedChats = chats.map(chat =>
+        chat.title === title ? { ...chat, title: newTitle } : chat
+      );
+      setChats(updatedChats);
+      localStorage.setItem('chats', JSON.stringify(updatedChats));
+      if (chatTitle === title) {
+        setChatTitle(newTitle);
+        localStorage.setItem('chatTitle', newTitle);
+      }
+    }
   };
 
   const toggleOptionsMenu = (index, event) => {
-    event.stopPropagation(); // Prevent triggering document click event
+    event.stopPropagation();
     const updatedChats = chats.map((chat, idx) => {
       if (index === idx) {
         chat.showOptions = !chat.showOptions;
@@ -337,97 +480,66 @@ function App() {
     setChats(updatedChats);
   };
 
-  const toggleSidebar = (sidebar) => {
-    if (sidebar === 'savedChats') {
-      setShowSavedChats(!showSavedChats);
-      if (!showSavedChats) {
-        setShowChatHistory(false);
-      }
-    } else if (sidebar === 'chatHistory') {
-      setShowChatHistory(!showChatHistory);
-      if (!showChatHistory) {
-        setShowSavedChats(false);
-      }
-    }
-  };
-
-  const escapeHtml = (unsafe) => {
-    return unsafe
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  };
-
-  const handleClickOutside = (event) => {
-    setChats((prevChats) => prevChats.map((chat) => ({ ...chat, showOptions: false })));
-  };
-
-  useEffect(() => {
-    document.addEventListener('click', handleClickOutside);
-    return () => {
-      document.removeEventListener('click', handleClickOutside);
-    };
-  }, []);
-
   return (
-    <div className={`App ${themeClasses}`}>
+    <div className={`App ${theme}`}>
       <header className="App-header">
         <button className="toggle-sidebar-button left" onClick={() => toggleSidebar('savedChats')}>
-          {showSavedChats ? <FaChevronLeft /> : <FaChevronRight />}
+          {showSavedChats ? <FaAngleLeft /> : <FaAngleRight />}
         </button>
-        {showSavedChats && (
-          <div className="sidebar visible">
-            <h2>Saved Chats</h2>
-            <ul>
-              {chats.map((chat, index) => (
-                <li key={index}>
-                  <button className="options-button" onClick={(event) => toggleOptionsMenu(index, event)}><FaEllipsisV /></button>
-                  <span onClick={() => loadChat(chat.title)}>{chat.title}</span>
-                  {chat.showOptions && (
-                    <div className="options-menu" style={{ top: chat.optionsPosition.top, left: chat.optionsPosition.left }}>
-                      <button onClick={() => deleteChat(chat.title)}>Delete</button>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-            <button className="new-chat-button" onClick={newChat}>New Chat</button>
-          </div>
-        )}
-        <div className="chat-container">
-          <h1>Chat with Assistant</h1>
-          <FaCog className="settings-icon" onClick={openModal} />
-          <div className="chat-log" ref={chatLogRef} style={{ height: isExpanded ? 'calc(100vh - 240px)' : 'calc(100vh - 240px)', lineHeight, fontSize: `${fontSize}px` }}>
-            {chatHistory.map((msg, index) => (
-              <div key={index} className={msg.speaker === 'You' ? 'user-message' : 'assistant-message'}>
-                <strong>{msg.speaker}:</strong>
-                {msg.speaker === 'You' ? (
-                  <>
-                    <span
-                      className={`user-message-content ${msg.isExpanded ? 'expanded' : ''}`}
-                      onClick={() => handleExpandMessage(index)}
-                      dangerouslySetInnerHTML={{ __html: msg.content }}
-                    ></span>
-                    {shouldShowExpandIcon(msg.content) && (
-                      <span className="expand-icon" onClick={() => handleExpandMessage(index)}>
-                        {msg.isExpanded ? <FaMinus /> : <FaPlus />}
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <span className="assistant-message-content" dangerouslySetInnerHTML={formatMessage(msg.content)}></span>
+        <div className={`sidebar ${showSavedChats ? 'visible' : ''}`}>
+          <h2>Saved Chats</h2>
+          <ul>
+            {chats.map((chat, index) => (
+              <li key={index}>
+                <button className="options-button" onClick={(event) => toggleOptionsMenu(index, event)}><FaEllipsisV /></button>
+                <span onClick={() => loadChat(chat.title)}>{chat.title}</span>
+                {chat.showOptions && (
+                  <div className="options-menu" style={{ top: chat.optionsPosition.top, left: chat.optionsPosition.left }}>
+                    <button onClick={() => deleteChat(chat.title)}>Delete</button>
+                    <button onClick={() => handleRenameChat(chat.title)}>Rename</button>
+                  </div>
                 )}
-              </div>
+              </li>
             ))}
-            {loading && (
-              <div className="typing-indicator">
-                <div className="typing-dot"></div>
-                <div className="typing-dot"></div>
-                <div className="typing-dot"></div>
-              </div>
-            )}
+          </ul>
+          <button className="new-chat-button" onClick={newChat}>New Chat</button>
+        </div>
+        <div className="chat-container">
+          <div className="chat-header">
+            <h1>Chat with Assistant</h1>
+            <FaCog className="settings-icon" onClick={openModal} />
+          </div>
+          <div className="chat-log" ref={chatLogRef} style={{ height: isExpanded ? 'calc(100vh - 240px)' : 'calc(100vh - 240px)', lineHeight, fontSize: `${fontSize}px` }}>
+            <div className="chat-log-content">
+              {chatHistory.map((msg, index) => (
+                <div key={index} className={msg.speaker === 'You' ? 'user-message' : 'assistant-message'}>
+                  <strong>{msg.speaker}:</strong>
+                  {msg.speaker === 'You' ? (
+                    <>
+                      <span
+                        className={`user-message-content ${msg.isExpanded ? 'expanded' : ''}`}
+                        onClick={() => handleExpandMessage(index)}
+                        dangerouslySetInnerHTML={{ __html: msg.content }}
+                      ></span>
+                      {shouldShowExpandIcon(msg.content) && (
+                        <span className="expand-icon" onClick={() => handleExpandMessage(index)}>
+                          {msg.isExpanded ? <FaMinus /> : <FaPlus />}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="assistant-message-content" dangerouslySetInnerHTML={formatMessage(msg.content)}></span>
+                  )}
+                </div>
+              ))}
+              {loading && (
+                <div className="typing-indicator">
+                  <div className="typing-dot"></div>
+                  <div className="typing-dot"></div>
+                  <div className="typing-dot"></div>
+                </div>
+              )}
+            </div>
           </div>
           <div className={`input-container ${isExpanded ? 'expanded' : ''}`}>
             <button onClick={toggleExpand} className="expand-button">
@@ -441,37 +553,37 @@ function App() {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   sendMessage();
-                  setUserInput('');
                 }
               }}
               placeholder="Type a message..."
             />
-            <button onClick={() => { sendMessage(); setUserInput(''); }}>Send</button>
+            <button onClick={sendMessage}>Send</button>
           </div>
-          {window.innerWidth >= 768 && (
-            <div className="new-line-instruction">
-              <small><strong>Shift</strong> + <strong>Return/Enter</strong> to add a new line</small>
-            </div>
-          )}
+          <div className="new-line-instruction">
+            <small><strong>Shift</strong> + <strong>Return/Enter</strong> to add a new line</small>
+          </div>
         </div>
         <button className="toggle-sidebar-button right" onClick={() => toggleSidebar('chatHistory')}>
-          {showChatHistory ? <FaChevronRight /> : <FaChevronLeft />}
+          {showChatHistory ? <FaAngleRight /> : <FaAngleLeft />}
         </button>
-        {showChatHistory && (
-          <div className="history-sidebar visible">
-            <h2>Chat History</h2>
-            <ul>
-              {chatHistory
-                .filter(msg => msg.speaker === 'You')
-                .map((msg, index) => (
-                  <li key={index} onClick={() => scrollToMessage(index)}>
-                    <span>{msg.content}</span>
-                  </li>
-                ))}
-            </ul>
-          </div>
-        )}
+        <div className={`history-sidebar ${showChatHistory ? 'visible' : ''}`}>
+          <h2>Chat History</h2>
+          <ul>
+            {chatHistory
+              .filter(msg => msg.speaker === 'You')
+              .map((msg, index) => (
+                <li key={index} onClick={() => scrollToMessage(index)}>
+                  <span>{msg.content}</span>
+                </li>
+              ))}
+          </ul>
+        </div>
       </header>
+      {confirmationPopupVisible && (
+        <div className="confirmation-popup">
+          Suggestion submitted successfully!
+        </div>
+      )}
       <Modal
         isOpen={modalIsOpen}
         onRequestClose={closeModal}
@@ -480,6 +592,7 @@ function App() {
         overlayClassName="modal-overlay"
       >
         <h2>Settings</h2>
+        <p>Version: v 1</p>
         <div className="setting">
           <label>Line Height</label>
           <input
@@ -502,48 +615,56 @@ function App() {
             onChange={handleFontSizeChange}
           />
         </div>
-        <button onClick={() => changeTheme('light')}>Light Theme</button>
-        <button onClick={() => changeTheme('purple')}>Purple Theme</button>
-        <button onClick={() => changeTheme('blue')}>Blue Theme</button>
-        <button onClick={() => changeTheme('black')}>Black Theme</button>
-        <button onClick={closeModal}>Close</button>
         <div className="setting">
-          <h3>Submit Suggestion</h3>
-          <form onSubmit={handleSubmitSuggestion}>
-            <input
-              type="text"
-              value={userName}
-              onChange={(e) => setUserName(e.target.value)}
-              placeholder="Enter your name..."
-              required
-            />
-            <textarea
-              value={suggestion}
-              onChange={(e) => setSuggestion(e.target.value)}
-              placeholder="Enter your suggestion..."
-              required
-            />
-            <button type="submit">Submit</button>
-          </form>
-          <button onClick={openSuggestionsModal}>View Suggestions</button>
+          <label>Theme</label>
+          <select value={theme} onChange={(e) => changeTheme(e.target.value)} className="large-dropdown">
+            <option value="dark-theme">Dark</option>
+            <option value="light-theme">Light</option>
+            <option value="blue-theme">Blue</option>
+            <option value="purple-theme">Purple</option>
+          </select>
         </div>
+        <button onClick={openSuggestionsModal}>Suggestion</button>
+        <button onClick={openViewSuggestionsModal}>View Suggestions</button>
+        <button onClick={closeModal}>Close</button>
       </Modal>
       <Modal
         isOpen={suggestionsModalIsOpen}
         onRequestClose={closeSuggestionsModal}
-        contentLabel="Suggestions Modal"
-        className="suggestions-modal"
+        contentLabel="Suggestion Modal"
+        className="settings-modal"
+        overlayClassName="modal-overlay"
+      >
+        <h2>Suggestion</h2>
+        <form onSubmit={handleSuggestionSubmit}>
+          <div className="setting">
+            <label>Name</label>
+            <input type="text" name="name" required />
+          </div>
+          <div className="setting">
+            <label>Suggestion</label>
+            <textarea name="suggestion" required></textarea>
+          </div>
+          <button type="submit">Submit</button>
+          <button type="button" onClick={closeSuggestionsModal}>Close</button>
+        </form>
+      </Modal>
+      <Modal
+        isOpen={viewSuggestionsModalIsOpen}
+        onRequestClose={closeViewSuggestionsModal}
+        contentLabel="View Suggestions Modal"
+        className="settings-modal"
         overlayClassName="modal-overlay"
       >
         <h2>Suggestions</h2>
-        <div className="suggestions-list">
-          {suggestions.map((suggestion, index) => (
-            <div key={index} className="suggestion-item">
-              <p><strong>{suggestion.userName}:</strong> {suggestion.suggestion}</p>
-            </div>
+        <ul>
+          {suggestions.map((s, index) => (
+            <li key={index}>
+              <strong>{s.userName}</strong>: {s.suggestion}
+            </li>
           ))}
-        </div>
-        <button onClick={closeSuggestionsModal}>Close</button>
+        </ul>
+        <button onClick={closeViewSuggestionsModal}>Close</button>
       </Modal>
     </div>
   );
