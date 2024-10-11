@@ -11,6 +11,13 @@ WSGIScriptAlias / /home/your_username/public_html/your_project_directory/wsgi.py
     Require all granted
 </Directory>
 
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type"
+</IfModule>
+
+
 # Python path
 WSGIDaemonProcess your_project_directory python-path=/home/your_username/public_html/your_project_directory:/home/your_username/public_html/your_project_directory/venv/lib/python3.x/site-packages
 WSGIProcessGroup your_project_directory
